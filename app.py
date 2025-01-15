@@ -9,18 +9,15 @@ from utils.qvapay_api import QvaPay
 # Main app
 st.title("QvaPay P2P Exchange Insights")
 
-try:
-    qva_pay = QvaPay()
-except Exception as e:
-    st.error(f"Error obteniendo los datos: {e}")
-
+if 'qva_pay' not in st.session_state:
+    st.session_state.qva_pay = QvaPay()
 
 if 'database_updated' not in st.session_state:
     st.session_state.database_updated = False
 
 if not st.session_state.database_updated:
     try:
-        qva_pay.update_db()
+        st.session_state.qva_pay.update_db()
         st.session_state.database_updated = True
     except Exception as e:
         st.error(f"Error obteniendo los datos: {e}")
@@ -34,7 +31,7 @@ update_btn = st.sidebar.button("Actualizar datos")
 
 if update_btn:
     try:
-        qva_pay.update_db()
+        st.session_state.qva_pay.update_db()
     except Exception as e:
         st.error(f"Error obteniendo los datos: {e}")
 
@@ -42,20 +39,26 @@ if update_btn:
 if symbol == "GENERAL":
     st.subheader("General")
     top = st.number_input("Top Market Makers", value=10, step=1)
-    market_maker = qva_pay.get_users_info_by_id(qva_pay.get_market_makers(10, "all"))
+    market_maker = st.session_state.qva_pay.get_users_info_by_id(st.session_state.qva_pay.get_market_makers(10, "all"))
     for index, user in enumerate(reversed(market_maker)):
         st.write(f"{index+1} - Nombre: {user["name"]} {user["lastname"]}")
-        st.write(f"Total: ${qva_pay.user_coin_query[user["uuid"]]["all"]}")
+        st.write(f"Total: ${st.session_state.qva_pay.user_coin_query[user["uuid"]]["all"]}")
 else:
     st.subheader(f" Datos de {symbol}")
     st.subheader(f" Datos de {symbol}")
-    oferta, demanda = qva_pay.get_supply(symbol, start_date, end_date)
-    compra, venta = qva_pay.get_spread(symbol, start_date, end_date) 
+    oferta, demanda = st.session_state.qva_pay.get_supply(symbol, start_date, end_date)
+    compra, venta = st.session_state.qva_pay.get_spread(symbol, start_date, end_date) 
     st.text(f"Total de oferta: ${oferta}")
     st.text(f"Total de demanda: ${demanda}")
-    st.text(f"Spread: ${abs(compra-venta)}")
-    st.text(f"Precio de compra: ${compra}")
-    st.text(f"Precio de venta: ${venta}")
+    if compra == 0 or venta == 0:
+        if compra == 0:
+            st.write("Spread no disponible. Solo existen ordenes de venta")
+        else:
+            st.write("Spread no disponible. Solo existen ordenes de compra")
+    else:
+        st.text(f"Spread: ${abs(compra-venta)}")
+        st.text(f"Precio de compra: ${compra}")
+        st.text(f"Precio de venta: ${venta}")
 
 # Footer
 st.markdown("---")

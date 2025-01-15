@@ -104,6 +104,8 @@ class QvaPay:
                         bid = rate if rate > bid else bid
                     else:
                         bid = rate
+        bid = 0 if bid == None else bid
+        ask = 0 if bid == None else ask
         return bid, ask
 
     def get_supply(self, currency: str, start_date: datetime.date,
