@@ -32,6 +32,12 @@ start_date = st.sidebar.date_input("Fecha de inicio", value=datetime.now() - pd.
 end_date = st.sidebar.date_input("Fecha de cierre", value=datetime.now())
 update_btn = st.sidebar.button("Actualizar datos")
 
+if update_btn:
+    try:
+        qva_pay.update_db()
+    except Exception as e:
+        st.error(f"Error obteniendo los datos: {e}")
+
 
 if symbol == "GENERAL":
     st.subheader("General")

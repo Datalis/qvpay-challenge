@@ -105,3 +105,19 @@ class QvaPay:
                     else:
                         bid = rate
         return bid, ask
+
+    def get_supply(self, currency: str, start_date: datetime.date,
+                    end_date: datetime.date) -> tuple:
+        """
+        Gets the total demand and offer of a given coin from within two dates.
+        """
+        oferta = 0.0
+        demanda = 0.0
+        for order in self.db_orders.values():
+            current = self.__get_date(db_order_entry=order)
+            if order["coin"] == currency and self.__is_date_in(current, start_date, end_date):
+                if order["type"] == "buy":
+                    oferta += float(order["amount"])
+                if order["type"] == "sell":
+                    demanda += float(order["amount"])
+        return oferta, demanda
