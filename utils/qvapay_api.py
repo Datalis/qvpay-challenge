@@ -136,3 +136,38 @@ class QvaPay:
         list_users.sort(key=lambda x: x[1][coin])
         data = list_users[-top:] 
         return [user[0] for user in data]
+    
+    def get_market_makers_spread(self, top: int, coin: str, start: datetime.date,
+                                  end: datetime.date) -> list:
+        """
+        Gets the market makers spread of a given coin by date
+        from within two dates
+        """
+        date_order_query = {}
+        market_makers_uuid = self.get_market_makers(top, coin)
+        for key, order in self.db_orders.items():
+            date = self.__get_date(db_order_entry=order)
+            rate = float(order["amount"]) / float(order["receive"])
+            # validar ofertas de interes
+            if order["owner"]["uuid"] in market_makers_uuid and order["coin"] == coin and self.__is_date_in(date, start, end):
+                if date in date_order_query:
+                    if order["type"] == "sell":
+                        if date_order_query[date]["bid"] != None and rate > date_order_query[date]["bid"]:
+                            date_order_query[date]["bid"] = rate
+                        else:
+                            date_order_query[date]["bid"] = rate
+                    else:
+                        if date_order_query[date]["ask"] != None and rate < date_order_query[date]["ask"]:
+                            date_order_query[date]["ask"] = rate
+                        else:
+                            date_order_query[date]["ask"] = rate
+                else:
+                    if order["type"] == "buy":
+                        date_order_query[date] = {"bid": rate, "ask":None}
+                    else:
+                        date_order_query[date] = {"ask": rate, "bid":None}  
+        sorted_list = sorted([*date_order_query.items()], key=lambda x: x[0])
+        for index, (date, spread) in enumerate(sorted_list):
+            if spread["ask"] == None or spread["bid"]== None:
+                del sorted_list[index]
+        return sorted_list
