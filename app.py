@@ -48,6 +48,14 @@ if symbol == "GENERAL":
         st.write(f"Total: ${qva_pay.user_coin_query[user["uuid"]]["all"]}")
 else:
     st.subheader(f" Datos de {symbol}")
+    st.subheader(f" Datos de {symbol}")
+    oferta, demanda = qva_pay.get_supply(symbol, start_date, end_date)
+    compra, venta = qva_pay.get_spread(symbol, start_date, end_date) 
+    st.text(f"Total de oferta: ${oferta}")
+    st.text(f"Total de demanda: ${demanda}")
+    st.text(f"Spread: ${abs(compra-venta)}")
+    st.text(f"Precio de compra: ${compra}")
+    st.text(f"Precio de venta: ${venta}")
 
 # Footer
 st.markdown("---")
