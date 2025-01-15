@@ -121,3 +121,18 @@ class QvaPay:
                 if order["type"] == "sell":
                     demanda += float(order["amount"])
         return oferta, demanda
+    
+    def get_users_info_by_id(self, users_id: str) -> list:
+        """
+        Get the users info by the uuid
+        """
+        return [self.db_users[uuid] for uuid in users_id]
+
+    def get_market_makers(self, top: int, coin: str) -> tuple:
+        """
+        Gets the uuid of the top market makers
+        """
+        list_users = [*self.user_coin_query.items()]
+        list_users.sort(key=lambda x: x[1][coin])
+        data = list_users[-top:] 
+        return [user[0] for user in data]
