@@ -24,3 +24,36 @@ def get_date_chart(data):
     # Show grid lines
     ax.grid(True)
     return fig      
+
+def get_daily_spread_chart(data):
+    dates = [element[0] for element in data]
+    values = [abs(element[1]["ask"] - element[1]["bid"]) for element in data]
+    
+    # Convert datetime.date objects to matplotlib's date format
+    date_list = [mdates.date2num(date) for date in dates]
+
+    # Create plot
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    # Plot the data
+    ax.plot(date_list, values, marker='o')
+
+    # Format the x-axis
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
+
+    # Set tick locations
+    ax.set_xticks(date_list)
+
+    # Rotate x-axis labels
+    plt.gcf().autofmt_xdate()
+
+    # Add title and labels
+    ax.set_title('Spread diario')
+    ax.set_xlabel('Fecha')
+    ax.set_ylabel('Spread')
+
+    # Show grid lines
+    ax.grid(True)
+
+    return fig
