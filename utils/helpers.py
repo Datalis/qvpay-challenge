@@ -1,27 +1,26 @@
 import matplotlib.pyplot as plt
-
-def process_dates(data):
-    for date, spread in data:
-        if spread["ask"] == None or spread["bid"]== None:
-            del data[date]
-        else:
-            data[date]
+import matplotlib.dates as mdates
     
 def get_date_chart(data):
-    # Configuramos el eje X para que acepte fechas
-    plt.gca().xaxis.set_major_formatter(plt.matplotlib.dates.DateFormatter('%Y-%m-%d'))
+    # Create plot
+    fig, ax = plt.subplots(figsize=(12, 6))
+    dates = [element[0] for element in data]
+    values = [abs(element[1]["ask"] - element[1]["bid"]) for element in data]
 
-    # Creamos el gráfico
-    fig = plt.figure(figsize=(10, 6))
-    for i in range(len(data)):
-        plt.plot(data[0], data[1], 'bo-')
+    ax.plot_date(dates, values)
 
-    # Configuramos los ejes y título
-    plt.xlabel('Fecha')
-    plt.ylabel('Valor')
-    plt.title('Gráfico con fechas en el eje X')
+    # Customize x-axis
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
 
-    # Formateamos las fechas del eje X
+    # Rotate x-axis labels
     plt.gcf().autofmt_xdate()
 
-    return fig
+    # Add title and labels
+    ax.set_title('Spread diario')
+    ax.set_xlabel('Fecha')
+    ax.set_ylabel('Spread')
+
+    # Show grid lines
+    ax.grid(True)
+    return fig      

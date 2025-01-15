@@ -5,6 +5,7 @@ import pandas as pd
 
 from common.var import COINS
 from utils.qvapay_api import QvaPay
+from utils.helpers import get_date_chart
 
 # Main app
 st.title("QvaPay P2P Exchange Insights")
@@ -39,12 +40,11 @@ if update_btn:
 if symbol == "GENERAL":
     st.subheader("General")
     top = st.number_input("Top Market Makers", value=10, step=1)
-    market_maker = st.session_state.qva_pay.get_users_info_by_id(st.session_state.qva_pay.get_market_makers(10, "all"))
+    market_maker = st.session_state.qva_pay.get_users_info_by_id(st.session_state.qva_pay.get_market_makers(100, "all"))
     for index, user in enumerate(reversed(market_maker)):
         st.write(f"{index+1} - Nombre: {user["name"]} {user["lastname"]}")
         st.write(f"Total: ${st.session_state.qva_pay.user_coin_query[user["uuid"]]["all"]}")
 else:
-    st.subheader(f" Datos de {symbol}")
     st.subheader(f" Datos de {symbol}")
     oferta, demanda = st.session_state.qva_pay.get_supply(symbol, start_date, end_date)
     compra, venta = st.session_state.qva_pay.get_spread(symbol, start_date, end_date) 
@@ -59,6 +59,12 @@ else:
         st.text(f"Spread: ${abs(compra-venta)}")
         st.text(f"Precio de compra: ${compra}")
         st.text(f"Precio de venta: ${venta}")
+    st.subheader("Spread de los Market Makers")
+    top = st.number_input("Top Market Makers", value=10, step=1)
+    spreads = st.session_state.qva_pay.get_market_makers_spread(top, symbol,start_date, end_date)
+    fig = get_date_chart(spreads)
+    st.pyplot(fig)
+
 
 # Footer
 st.markdown("---")

@@ -7,10 +7,13 @@ from common.var import COINS
 class QvaPay:
     def __init__(self):
         # data for scraping
-        self.base_url = "https://qvapay.com/api/p2p?page={number}"
-        self.response = requests.get(self.base_url.format(number=1))
-        self.data = json.loads(self.response.text)
-        self.num_pages = self.data["last_page"]
+        #self.base_url = "https://qvapay.com/api/p2p?page={number}"
+        #self.response = requests.get(self.base_url.format(number=1))
+        #self.data = json.loads(self.response.text)
+        #self.num_pages = self.data["last_page"]
+        
+        self.num_pages = 28
+        
         # simulating db
         # table order
         self.db_orders = {}
@@ -34,8 +37,14 @@ class QvaPay:
         -------
         `void`
         """
-        data = requests.get(self.base_url.format(number=page))
-        data_json = json.loads(data.text)
+        # data = requests.get(self.base_url.format(number=page))
+        # data_json = json.loads(data.text)
+        
+        path = "qvapay/{number}.json"
+        json_file = open(path.format(number=page+1), "r")
+        json_read = json_file.read()
+        data_json = json.loads(json_read)
+        
         for i in range(len(data_json["data"])):
             uuid = data_json["data"][i]["uuid"]
             user_uuid = data_json["data"][i]["owner"]["uuid"]
@@ -169,7 +178,8 @@ class QvaPay:
                     else:
                         date_order_query[date] = {"ask": rate, "bid":None}  
         sorted_list = sorted([*date_order_query.items()], key=lambda x: x[0])
-        for index, (date, spread) in enumerate(sorted_list):
-            if spread["ask"] == None or spread["bid"]== None:
-                del sorted_list[index]
-        return sorted_list
+        market_makers_spreads = []
+        for date, spread in sorted_list:
+            if spread["ask"] != None and spread["bid"] != None:
+                market_makers_spreads.append((date, spread)) 
+        return market_makers_spreads
