@@ -19,7 +19,7 @@ def get_date_chart(data):
     plt.gcf().autofmt_xdate()
 
     # Add title and labels
-    ax.set_title('Spread diario')
+    ax.set_title('Spread diario de los market makers')
     ax.set_xlabel('Fecha')
     ax.set_ylabel('Spread')
 
