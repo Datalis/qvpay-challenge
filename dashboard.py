@@ -1,0 +1,306 @@
+import pandas as pd
+import requests
+import json
+import logging
+from dash import Dash, dcc, html, Input, Output, dash_table
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime
+
+# Configurar el logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Configurar el logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Descargar y procesar los datos de la API
+logger.info("Starting data fetch from API...")
+base = []
+path = "https://qvapay.com/api/p2p"
+
+def get_data(path):
+    logger.debug(f"Fetching data from: {path}")
+    response = requests.get(path)
+    logger.debug(f"Response status code: {response.status_code}")
+    return response.json()
+
+while path:
+    data = get_data(path)
+    base.extend(data['data'])
+    path = data['next_page_url']
+    logger.info(f"Fetched {len(data['data'])} records. Next page: {path}")
+
+# Guardar los datos en un archivo JSON para referencia
+current_time = datetime.now()
+filename_date = current_time.strftime("%Y-%m-%d_%H-%M-%S")
+with open(f"base{filename_date}.json", "w") as file:
+    json.dump(base, file, indent=4)
+logger.info(f"Data saved to base{filename_date}.json")
+
+# Leer el archivo JSON
+# json_file_path = f'./base{current_time}.json'
+# with open(json_file_path, 'r') as file:
+#     base = json.load(file)
+
+# Crear DataFrame
+base_df = pd.DataFrame(base)
+logger.debug(f"DataFrame created with {len(base_df)} records.")
+
+# Procesar y filtrar los datos
+try:
+    base_df["date"] = base_df["updated_at"]
+    filtered_base = pd.DataFrame({
+        'id': base_df['uuid'],
+        'date': pd.to_datetime(base_df['date']).dt.date,
+        'user': base_df['owner'].apply(lambda x: x.get('username', 'Unknown')),
+        'coin': base_df['coin'],
+        'type': base_df['type'],
+        'amount': pd.to_numeric(base_df["amount"], errors='coerce'),
+        'receive': pd.to_numeric(base_df["receive"], errors='coerce'),
+    })
+    filtered_base['price'] = filtered_base["receive"] / filtered_base["amount"]
+    logger.info("Data filtering completed successfully.")
+except Exception as e:
+    logger.error(f"Error during data processing: {e}")
+
+# Revisar si el DataFrame está vacío
+if filtered_base.empty:
+    logger.warning("Filtered base is empty! Check your data source.")
+
+# Agrupar los datos para la tabla
+try:
+    grouped_data = (
+    filtered_base
+    .groupby(['coin', 'date', 'type'])
+    .agg(
+        total_amount=('amount', 'sum'),
+        #modal_variance=('price', 'mode'),
+        median_price=('price', 'median'),
+        mean_price=('price', 'mean'),
+        price_variance=('price', 'var')
+    )
+    .reset_index()
+)
+    buy_sell_diff = (
+    filtered_base
+    .groupby(['coin', 'date'])
+    .apply(lambda x: x[x['type'] == 'buy']['amount'].sum() - x[x['type'] == 'sell']['amount'].sum())
+    .reset_index(name='buy_sell_diff')
+)
+
+    # Merge the buy_sell_diff with grouped_data
+    grouped_data = pd.merge(grouped_data, buy_sell_diff, on=['coin', 'date'], how='left')
+
+    grouped_data.columns = [
+        'Moneda', 'Fecha', 'Tipo de ofertas',
+        'Oferta total en USDT', 'Mediana de los precios', 'Precio medio', 'Varianza del precio', 'Diferencia demanda/oferta'
+    ]
+    logger.info("Data grouping completed successfully.")
+except Exception as e:
+    logger.error(f"Error during data grouping: {e}")
+
+# Inicializar la app Dash
+app = Dash(__name__)
+
+# Layout de la app
+app.layout = html.Div([
+    html.H1("Análisis general de transacciones abiertas en QvaPay", style={'text-align': 'center', 'font-family': 'Calibri'}),
+    html.Div([
+        html.Label("Seleccionar moneda:",style={'font-family': 'Calibri'}),
+        dcc.Dropdown(
+            id='coin-selector',
+            options=[{'label': coin, 'value': coin} for coin in filtered_base['coin'].unique()],
+            value=filtered_base['coin'].unique()[0] if not filtered_base.empty else None,
+            style={'width': '90%', 'font-family': 'Calibri'}
+        ),
+        html.Label("Seleccionar fecha:",style={'font-family': 'Calibri'}),
+        dcc.Dropdown(
+            id='date-selector',
+            options=[{'label': str(date), 'value': str(date)} for date in filtered_base['date'].unique()],
+            value=str(filtered_base['date'].unique()[0]) if not filtered_base.empty else None,
+            style={'width': '90%', 'font-family': 'Calibri'}
+        ),
+        html.Label("Seleccionar tipo de oferta:",style={'font-family': 'Calibri'}),
+        dcc.RadioItems(
+            id='type-selector',
+            options=[
+                {'label': 'Compra', 'value': 'buy'},
+                {'label': 'Venta', 'value': 'sell'}
+            ],
+            value='buy',
+           style={'font-family': 'Calibri'}
+        ),
+    ], style={
+        'background-color': '#f9f9f9', 
+        'padding': '10px', 
+        'box-shadow': '0px 4px 10px rgba(0,0,0,0.1)'
+    }),
+    dcc.Graph(id='price-amount-graph'),
+    dash_table.DataTable(
+        id='summary-table',
+        columns=[{"name": col, "id": col} for col in grouped_data.columns] if not grouped_data.empty else [],
+        style_table={'overflowX': 'auto', 'font-family': 'Calibri'},
+        style_cell={'textAlign': 'center', 'font-family': 'Calibri'},
+        style_header={'fontWeight': 'bold', 'font-family': 'Calibri'},
+        style_data_conditional=[
+            {
+                'if': {'row_index': 'odd'},
+                'backgroundColor': 'rgb(248, 248, 248)'
+            }
+        ],
+    ),
+    dcc.Graph(id='offer-demand-graph'),
+    
+    html.H1("Análisis de transacciones por usuario", style={'textAlign': 'center'}),
+    dcc.Input(
+        id='user-input',
+        type='text',
+        placeholder='Enter a user name',
+        debounce=True,
+        style={'margin-bottom': '10px'}
+    ),
+    dcc.Graph(id='user-transaction-graph')
+], style={'background-color': '#f4f4f4', 'margin': '0', 'font-family': 'Calibri'})
+
+# Callbacks
+@app.callback(
+    [Output('price-amount-graph', 'figure'),
+     Output('summary-table', 'data'),
+     Output('offer-demand-graph', 'figure'),     
+     Output('user-transaction-graph', 'figure')],
+    [Input('coin-selector', 'value'),
+     Input('date-selector', 'value'),
+     Input('type-selector', 'value'),
+     Input('user-input', 'value')]
+)
+def update_dashboard(selected_coin, selected_date, selected_type, user):
+    logger.debug(f"Updating dashboard for Coin: {selected_coin}, Date: {selected_date}, Type: {selected_type}")
+    if not selected_coin or not selected_date:
+        logger.warning("No valid selection for coin or date.")
+        return {}, [], go.Figure().update_layout(title="Please enter a user name")
+
+    selected_date = pd.to_datetime(selected_date).date()
+    filtered_data = filtered_base[
+        (filtered_base['coin'] == selected_coin) & 
+        (filtered_base['date'] == selected_date) & 
+        (filtered_base['type'] == selected_type)
+    ]
+
+    if filtered_data.empty:
+        logger.warning("No data found for the selected filters.")
+        return {}, {}, [], go.Figure().update_layout(title="Please enter a user name")
+
+    # Gráfico de precio vs cantidad
+    fig1 = px.scatter(
+        filtered_data,
+        x='amount',
+        y='price',
+        title="Precios vs. monto de las ofertas respecto a la mediana de los precios disponibles",
+        color='type',
+        labels={'amount':'Monto de la oferta', 'price':'Precio del USDT'}
+    )
+
+    f = grouped_data[(grouped_data['Fecha'] == selected_date) & (grouped_data['Moneda'] == selected_coin) & (grouped_data['Tipo de ofertas'] == selected_type)]
+    logger.info(f)
+    value = f['Mediana de los precios']
+    logger.info(value)
+    fig1.add_hline(value.sum())
+
+    grouped_data['buy_sell_ratio'] = grouped_data[grouped_data["Tipo de ofertas"]=='buy']['Oferta total en USDT'] / grouped_data[grouped_data["Tipo de ofertas"]=='sell']['Oferta total en USDT'].replace(0, float('inf'))
+
+    # Create the line chart
+    fig2 = go.Figure()
+    fig2.add_trace(go.Scatter(
+        x=grouped_data['date'],
+        y=grouped_data["buy_sell_diff"],
+        mode='lines+markers',
+        name='Diferencia diaria entre demanda y oferta',
+        line=dict(color='purple', width=2),
+        marker=dict(size=6)
+    ))
+
+    # Configure the layout
+    fig2.update_layout(
+        title='Diferencia diaria entre demanda y oferta',
+        xaxis_title="Fecha",
+        yaxis_title="Diferencia entre demanda (USDT) y oferta (USDT)",
+        plot_bgcolor="white",
+        xaxis=dict(showgrid=True, gridcolor="lightgrey"),
+        yaxis=dict(showgrid=True, gridcolor="lightgrey"),
+        margin=dict(l=40, r=40, t=50, b=40)
+    )
+
+    # Datos de la tabla
+    filtered_table_data = grouped_data[(grouped_data['Fecha'] == selected_date) & (grouped_data['Tipo de ofertas'] == selected_type)].to_dict('records')
+    logger.info(f"Filtered data size: {len(filtered_data)}, Table data size: {len(filtered_table_data)}")
+
+    # Gráfico de transacciones por usuario
+    user_transactions_fig = plot_user_transactions(user)
+
+    return fig1, fig2, filtered_table_data, user_transactions_fig
+
+def plot_user_transactions(user):
+    # Filter data for the selected user
+    user_data = filtered_base[filtered_base['user'] == user]
+    
+    if user_data.empty:
+        return go.Figure().update_layout(title=f"No transactions found for user: {user}")
+
+    # Calculate cumulative stock
+    user_data['cumulative_stock'] = user_data.apply(
+        lambda row: row['amount'] if row['type'] == 'buy' else -row['amount'], axis=1
+    ).cumsum()
+
+    # Initialize the figure
+    fig = go.Figure()
+
+    # Get unique days for background shading
+    unique_days = user_data['date'].unique()
+    
+    for idx, day in enumerate(unique_days):
+        day_data = user_data[user_data['date'] == day]
+        start = day_data.index[0] - 0.5
+        end = day_data.index[-1] + 0.5
+        color = 'rgba(200, 200, 200, 0.2)' if idx % 2 == 0 else 'rgba(255, 255, 255, 0.2)'
+        fig.add_shape(
+            type="rect",
+            x0=start, x1=end,
+            y0=min(user_data['cumulative_stock']), y1=max(user_data['cumulative_stock']),
+            fillcolor=color,
+            line=dict(width=0),
+            layer="below"
+        )
+    
+    # Plot floating bars for each transaction
+    prev_stock = 0  # Start cumulative stock at 0
+    for i, row in user_data.iterrows():
+        new_stock = prev_stock + (row['amount'] if row['type'] == 'buy' else -row['amount'])
+        color = 'green' if row['type'] == 'buy' else 'gray'
+        fig.add_trace(go.Bar(
+            x=[i],
+            y=[new_stock - prev_stock],
+            base=[prev_stock],
+            marker_color=color,
+            name='Buy' if color == 'green' else 'Sell',
+            showlegend=False  # Disable repeated legends
+        ))
+        prev_stock = new_stock  # Update the stock
+    
+    # Configure layout
+    fig.update_layout(
+        title=f'Transactions for User: {user}',
+        xaxis=dict(title='Transactions', tickmode='linear'),
+        yaxis=dict(title='Stock'),
+        barmode='overlay',
+        plot_bgcolor='white',
+        legend=dict(title="Transaction Type")
+    )
+    
+    return fig
+
+# Ejecutar la app
+if __name__ == '__main__':
+    logger.info("Starting the Dash server...")
+    app.run_server(debug=True)
