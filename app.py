@@ -5,7 +5,7 @@ import pandas as pd
 
 from common.var import COINS
 from utils.qvapay_api import QvaPay
-from utils.helpers import get_date_chart, get_daily_spread_chart
+from utils.helpers import get_date_chart, get_daily_spread_chart, offer_vs_demmand
 
 # Main app
 st.title("QvaPay P2P Exchange Insights")
@@ -59,6 +59,14 @@ else:
         st.text(f"Spread: ${abs(compra-venta)}")
         st.text(f"Precio de compra: ${compra}")
         st.text(f"Precio de venta: ${venta}")
+    daily_demand = st.session_state.qva_pay.get_daily_demand(symbol, start_date, end_date)
+    offer_demand = offer_vs_demmand(daily_spreads=daily_demand)
+    if offer_demand[0] > offer_demand[1]/3:
+        st.write("La oferta supera a la demanda consistentemente")
+    elif offer_demand[1] > offer_demand[0]/3:
+        st.write("La demanda supera a la oferta consistentemente")
+    else:
+        st.write("La demanda y la oferta estan prácticamente balanceadas")
     st.subheader("Spread diario")
     daily_spreads = st.session_state.qva_pay.get_daily_spread(symbol,start_date, end_date)
     fig_daily = get_daily_spread_chart(daily_spreads)

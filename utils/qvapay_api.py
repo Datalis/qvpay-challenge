@@ -178,6 +178,9 @@ class QvaPay:
         return market_makers_spreads
     
     def get_daily_spread(self, coin: str, start: datetime.date, end: datetime.date) -> list:
+        """
+        Gets the daily spread
+        """
         date_order_query = {}
         for key, order in self.db_orders.items():
             date = self.__get_date(db_order_entry=order)
@@ -201,9 +204,32 @@ class QvaPay:
                     else:
                         date_order_query[date] = {"ask": rate, "bid":None}  
         sorted_list = sorted([*date_order_query.items()], key=lambda x: x[0])
-        daily_spread = []
+        daily_spreads = []
         for date, spread in sorted_list:
             if spread["ask"] != None and spread["bid"] != None:
-                daily_spread.append((date, spread)) 
-        return daily_spread
+                daily_spreads.append((date, spread)) 
+        return daily_spreads
+    
+    def get_daily_demand(self, coin: str, start: datetime.date, end: datetime.date) -> list:
+        """
+        Gets the daily demand
+        """
+        date_order_query = {}
+        for key, order in self.db_orders.items():
+            date = self.__get_date(db_order_entry=order)
+            quantity = float(order["amount"])
+            # validar ofertas de interes
+            if order["coin"] == coin and self.__is_date_in(date, start, end):
+                if date in date_order_query:
+                    if order["type"] == "sell":
+                        date_order_query[date]["demand"] += quantity
+                    else:
+                        date_order_query[date]["offer"] = quantity
+                else:
+                    if order["type"] == "buy":
+                        date_order_query[date] = {"demand": quantity, "offer":0.0}
+                    else:
+                        date_order_query[date] = {"offer": quantity, "demand":0.0}  
+        sorted_list = sorted([*date_order_query.items()], key=lambda x: x[0]) 
+        return sorted_list
     

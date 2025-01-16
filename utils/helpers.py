@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import seaborn as sns
+sns.set()
     
 def get_date_chart(data):
     # Create plot
@@ -20,6 +22,13 @@ def get_date_chart(data):
     ax.set_title('Spread diario')
     ax.set_xlabel('Fecha')
     ax.set_ylabel('Spread')
+
+    if len(dates) > 100:
+        ax.set_xticks(ax.get_xticks()[::10])
+    elif len(dates) > 50:
+        ax.set_xticks(ax.get_xticks()[::5])
+    elif len(dates) > 20 and len(dates)<= 50:
+        ax.set_xticks(ax.get_xticks()[::2])
 
     # Show grid lines
     ax.grid(True)
@@ -53,7 +62,23 @@ def get_daily_spread_chart(data):
     ax.set_xlabel('Fecha')
     ax.set_ylabel('Spread')
 
+    if len(dates) > 100:
+        ax.set_xticks(ax.get_xticks()[::10])
+    elif len(dates) > 50:
+        ax.set_xticks(ax.get_xticks()[::5])
+    elif len(dates) > 20 and len(dates)<= 50:
+        ax.set_xticks(ax.get_xticks()[::2])
+
     # Show grid lines
     ax.grid(True)
-
     return fig
+
+def offer_vs_demmand(daily_spreads):
+    demand_offer = [0,0]
+    for element in daily_spreads:
+        difference = element[1]["demand"] - element[1]["offer"]
+        if difference > 0:
+            demand_offer[0] += 1
+        elif difference < 0:
+            demand_offer[1] += 1
+    return demand_offer
